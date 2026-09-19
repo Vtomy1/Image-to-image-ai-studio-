@@ -1,0 +1,6 @@
+{
+  "name": "Image to Image AI Studio",
+  "description": "Free and unlimited image-to-image AI transformation studio powered by multi-model diffusion and intelligent vision guidance.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
