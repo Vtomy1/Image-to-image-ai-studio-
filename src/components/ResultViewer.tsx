@@ -12,6 +12,14 @@ import {
   Check,
   X,
   Share2,
+  Info,
+  Calendar,
+  Hash,
+  Cpu,
+  Sliders,
+  Layers,
+  Clock,
+  ExternalLink,
 } from "lucide-react";
 import { GenerationResult, ModelInfo } from "../types";
 import { downloadImage } from "../utils/imageUtils";
@@ -41,7 +49,9 @@ export function ResultViewer({
   const [isDraggingSlider, setIsDraggingSlider] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [showDetails, setShowDetails] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +90,12 @@ export function ResultViewer({
     navigator.clipboard.writeText(currentResult.prompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyValue = (fieldKey: string, value: string | number) => {
+    navigator.clipboard.writeText(String(value));
+    setCopiedField(fieldKey);
+    setTimeout(() => setCopiedField(null), 1800);
   };
 
   return (
@@ -310,12 +326,178 @@ export function ResultViewer({
         {currentResult && (
           <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
             <button
+              onClick={() => setShowDetails((prev) => !prev)}
+              className={`rounded-lg backdrop-blur-md border p-2 transition-colors flex items-center gap-1.5 text-xs font-medium shadow-md ${
+                showDetails
+                  ? "bg-indigo-600 text-white border-indigo-500 shadow-indigo-600/30"
+                  : "bg-black/70 border-white/10 text-white hover:bg-black"
+              }`}
+              title="Toggle Image Details"
+              aria-label="Image Details"
+            >
+              <Info className="h-3.5 w-3.5 text-indigo-300" />
+              <span className="hidden sm:inline">Details</span>
+            </button>
+            <button
               onClick={() => setIsFullscreen(true)}
               className="rounded-lg bg-black/70 backdrop-blur-md border border-white/10 p-2 text-white hover:bg-black transition-colors"
               title="Fullscreen preview"
+              aria-label="Fullscreen"
             >
               <Maximize2 className="h-3.5 w-3.5" />
             </button>
+          </div>
+        )}
+
+        {/* Small Image Details Overlay Panel (embedded inside the viewer card) */}
+        {showDetails && currentResult && (
+          <div className="absolute inset-x-3 bottom-3 sm:inset-x-auto sm:right-3 sm:bottom-3 sm:w-84 max-h-[85%] bg-neutral-900/95 border border-neutral-700/80 rounded-xl shadow-2xl backdrop-blur-xl z-30 p-4 flex flex-col text-xs text-neutral-300 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-neutral-800">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                  <Info className="h-3.5 w-3.5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white text-xs">Image Details</h3>
+                  <p className="text-[10px] text-neutral-400">Generation metadata & parameters</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDetails(false)}
+                className="rounded-md p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                title="Close panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              {/* Model */}
+              <div className="flex items-center justify-between rounded-lg bg-neutral-950/70 p-2 border border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <Cpu className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                  <span className="text-neutral-400 font-medium">Model:</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-semibold text-white">
+                  <span>{currentResult.model}</span>
+                  <button
+                    onClick={() => handleCopyValue("model", currentResult.model)}
+                    className="text-neutral-400 hover:text-indigo-400 transition-colors p-0.5"
+                    title="Copy model name"
+                  >
+                    {copiedField === "model" ? (
+                      <Check className="h-3 w-3 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Seed */}
+              <div className="flex items-center justify-between rounded-lg bg-neutral-950/70 p-2 border border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <Hash className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                  <span className="text-neutral-400 font-medium">Seed:</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono text-amber-300">
+                  <span>{currentResult.seed}</span>
+                  <button
+                    onClick={() => handleCopyValue("seed", currentResult.seed)}
+                    className="text-neutral-400 hover:text-amber-300 transition-colors p-0.5"
+                    title="Copy seed"
+                  >
+                    {copiedField === "seed" ? (
+                      <Check className="h-3 w-3 text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Strength */}
+              <div className="flex items-center justify-between rounded-lg bg-neutral-950/70 p-2 border border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <Sliders className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                  <span className="text-neutral-400 font-medium">Strength:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-16 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-cyan-400 rounded-full"
+                      style={{ width: `${Math.round(currentResult.strength * 100)}%` }}
+                    />
+                  </div>
+                  <span className="font-semibold text-white">
+                    {Math.round(currentResult.strength * 100)}% ({currentResult.strength.toFixed(2)})
+                  </span>
+                </div>
+              </div>
+
+              {/* Generation Timestamp */}
+              <div className="flex items-center justify-between rounded-lg bg-neutral-950/70 p-2 border border-neutral-800/80">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span className="text-neutral-400 font-medium">Timestamp:</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-medium text-neutral-200 text-[11px]">
+                    {new Date(currentResult.timestamp).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </div>
+                  <div className="text-[10px] text-neutral-400 font-mono">
+                    {new Date(currentResult.timestamp).toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Execution Duration & Dimensions */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-neutral-950/70 p-2 border border-neutral-800/80">
+                  <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+                    <Clock className="h-3 w-3 text-violet-400" />
+                    <span>Duration</span>
+                  </div>
+                  <p className="text-xs font-semibold text-neutral-200 mt-0.5">
+                    {(currentResult.generationTimeMs / 1000).toFixed(2)}s
+                  </p>
+                </div>
+                <div className="rounded-lg bg-neutral-950/70 p-2 border border-neutral-800/80">
+                  <div className="flex items-center gap-1.5 text-[10px] text-neutral-400">
+                    <Layers className="h-3 w-3 text-pink-400" />
+                    <span>Resolution</span>
+                  </div>
+                  <p className="text-xs font-semibold text-neutral-200 mt-0.5">
+                    {currentResult.width || 1024} × {currentResult.height || 1024}
+                  </p>
+                </div>
+              </div>
+
+              {/* Prompt Box */}
+              <div className="rounded-lg bg-neutral-950/70 p-2.5 border border-neutral-800/80 space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-neutral-400">
+                  <span className="font-semibold text-neutral-300">Transformation Prompt:</span>
+                  <button
+                    onClick={handleCopyPrompt}
+                    className="flex items-center gap-1 text-neutral-400 hover:text-white transition-colors"
+                  >
+                    {copied ? <Check className="h-2.5 w-2.5 text-emerald-400" /> : <Copy className="h-2.5 w-2.5" />}
+                    <span>{copied ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-neutral-300 leading-relaxed max-h-24 overflow-y-auto break-words bg-black/40 p-1.5 rounded border border-neutral-800/50">
+                  {currentResult.prompt}
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -362,15 +544,34 @@ export function ResultViewer({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onOpenBatch}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300 hover:bg-purple-500/20 transition-colors"
-              title="Run this prompt across 4 models at once"
-            >
-              <Columns className="h-3.5 w-3.5" />
-              <span>Compare in 4 Models</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Image Details Button in Bottom Toolbar */}
+              <button
+                id="image-details-btn"
+                type="button"
+                onClick={() => setShowDetails((prev) => !prev)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  showDetails
+                    ? "border-indigo-500 bg-indigo-600/20 text-indigo-200 shadow-sm"
+                    : "border-neutral-700 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                }`}
+                title="View image details and metadata"
+              >
+                <Info className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Image Details</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenBatch}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300 hover:bg-purple-500/20 transition-colors"
+                title="Run this prompt across 4 models at once"
+              >
+                <Columns className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Compare 4 Models</span>
+                <span className="sm:hidden">Compare</span>
+              </button>
+            </div>
           </div>
 
           {/* Details & Prompt Snippet */}
