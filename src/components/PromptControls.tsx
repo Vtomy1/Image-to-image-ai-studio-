@@ -12,6 +12,12 @@ import {
   Maximize2,
   Lock,
   Unlock,
+  Palette,
+  Film,
+  Pencil,
+  BookOpen,
+  Check,
+  Plus,
 } from "lucide-react";
 import { STYLE_PRESETS, ASPECT_RATIOS } from "../data/presets";
 import { StylePreset, AspectRatioOption, ModelInfo } from "../types";
@@ -63,14 +69,18 @@ export function PromptControls({
 }: PromptControlsProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedStyleId, setSelectedStyleId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [replaceMode, setReplaceMode] = useState<boolean>(false);
+
+  const categories = ["All", "Cinematic", "Sketch", "Oil Painting", "Anime", "Popular"];
 
   const rollSeed = () => {
     setSeed(Math.floor(Math.random() * 1000000));
   };
 
-  const handleApplyStyle = (style: StylePreset) => {
+  const handleApplyStyle = (style: StylePreset, mode: "append" | "replace" = "append") => {
     setSelectedStyleId(style.id);
-    if (!prompt.trim()) {
+    if (mode === "replace" || !prompt.trim()) {
       setPrompt(style.prompt);
     } else if (!prompt.includes(style.prompt)) {
       setPrompt(`${prompt.trim()}, ${style.prompt}`);
@@ -132,29 +142,107 @@ export function PromptControls({
         </div>
       </div>
 
-      {/* Style Presets Chips */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs font-medium text-neutral-400">
-            Quick Style Presets
-          </span>
-          <span className="text-[11px] text-neutral-400">Click to append</span>
+      {/* Prompt Preset Library Section */}
+      <div className="rounded-xl border border-neutral-800/80 bg-neutral-950/70 p-3 space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1 border-b border-neutral-800/60">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-indigo-400" />
+            <span className="text-xs font-semibold text-neutral-200">
+              Prompt Preset Library
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-neutral-400">Mode:</span>
+            <div className="flex rounded-md bg-neutral-900 p-0.5 border border-neutral-800">
+              <button
+                type="button"
+                onClick={() => setReplaceMode(false)}
+                className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  !replaceMode
+                    ? "bg-indigo-600 text-white"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+                title="Append preset to current prompt"
+              >
+                + Append
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaceMode(true)}
+                className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  replaceMode
+                    ? "bg-indigo-600 text-white"
+                    : "text-neutral-400 hover:text-white"
+                }`}
+                title="Replace current prompt with preset"
+              >
+                Replace
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-          {STYLE_PRESETS.map((style) => {
+
+        {/* Category Tabs: Cinematic, Sketch, Oil Painting, Anime, etc. */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+          {categories.map((cat) => {
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                  isActive
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-neutral-900/90 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200 border border-neutral-800/80"
+                }`}
+              >
+                {cat === "Cinematic" && <Film className="h-3 w-3" />}
+                {cat === "Sketch" && <Pencil className="h-3 w-3" />}
+                {cat === "Oil Painting" && <Palette className="h-3 w-3" />}
+                {cat === "Anime" && <Sparkles className="h-3 w-3" />}
+                <span>{cat}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Preset Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+          {STYLE_PRESETS.filter(
+            (style) => activeCategory === "All" || style.category === activeCategory
+          ).map((style) => {
             const isApplied = selectedStyleId === style.id;
             return (
               <button
                 key={style.id}
                 type="button"
-                onClick={() => handleApplyStyle(style)}
-                className={`rounded-lg border px-2.5 py-1 text-xs transition-colors flex items-center gap-1 ${
+                onClick={() => handleApplyStyle(style, replaceMode ? "replace" : "append")}
+                className={`group relative text-left rounded-lg border p-2 text-xs transition-all flex flex-col justify-between ${
                   isApplied
-                    ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-200"
-                    : "border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200"
+                    ? "border-indigo-500/80 bg-indigo-500/15 text-indigo-100 shadow-sm"
+                    : "border-neutral-800/90 bg-neutral-900/60 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-900"
                 }`}
+                title={`Click to ${replaceMode ? "replace prompt with" : "append"} this style`}
               >
-                <span>{style.label}</span>
+                <div className="flex items-center justify-between w-full mb-1">
+                  <div className="flex items-center gap-1.5 font-medium truncate">
+                    <span className="truncate">{style.label}</span>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-neutral-400 px-1.5 py-0.2 rounded bg-neutral-950/60 border border-neutral-800 shrink-0">
+                    {style.category}
+                  </span>
+                </div>
+                <p className="text-[10px] text-neutral-400 line-clamp-2 leading-relaxed font-sans group-hover:text-neutral-300 transition-colors">
+                  {style.prompt}
+                </p>
+                <div className="mt-1 flex items-center justify-between pt-1 border-t border-neutral-800/50 text-[10px] text-neutral-400">
+                  <span>Rec. Strength: {style.strengthRecommendation ? Math.round(style.strengthRecommendation * 100) : 60}%</span>
+                  <span className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {replaceMode ? "Apply" : "+ Add"}
+                  </span>
+                </div>
               </button>
             );
           })}

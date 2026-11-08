@@ -5,6 +5,7 @@ import {
   RefreshCw,
   Sparkles,
   ArrowLeftRight,
+  ArrowUpDown,
   Columns,
   Eye,
   Zap,
@@ -34,7 +35,7 @@ interface ResultViewerProps {
   onOpenBatch: () => void;
 }
 
-type ViewMode = "split" | "side-by-side" | "output-only" | "original-only";
+type ViewMode = "split-horizontal" | "split-vertical" | "side-by-side" | "output-only" | "original-only";
 
 export function ResultViewer({
   currentResult,
@@ -47,7 +48,7 @@ export function ResultViewer({
 }: ResultViewerProps) {
   const [sliderPosition, setSliderPosition] = useState<number>(50); // percentage (0 to 100)
   const [isDraggingSlider, setIsDraggingSlider] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("split");
+  const [viewMode, setViewMode] = useState<ViewMode>("split-vertical");
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
@@ -57,13 +58,19 @@ export function ResultViewer({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Handle slider drag with mouse or touch
-  const handleMove = (clientX: number) => {
+  // Handle slider drag with mouse or touch (horizontal or vertical)
+  const handleMove = (clientX: number, clientY: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const pos = Math.max(0, Math.min(100, (x / rect.width) * 100));
-    setSliderPosition(pos);
+    if (viewMode === "split-vertical") {
+      const y = clientY - rect.top;
+      const pos = Math.max(0, Math.min(100, (y / rect.height) * 100));
+      setSliderPosition(pos);
+    } else {
+      const x = clientX - rect.left;
+      const pos = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      setSliderPosition(pos);
+    }
   };
 
   const handleMouseDown = () => setIsDraggingSlider(true);
@@ -71,13 +78,13 @@ export function ResultViewer({
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDraggingSlider) {
-      handleMove(e.clientX);
+      handleMove(e.clientX, e.clientY);
     }
   };
 
   const handleTouchMove = (e: TouchEvent) => {
     if (e.touches[0]) {
-      handleMove(e.touches[0].clientX);
+      handleMove(e.touches[0].clientX, e.touches[0].clientY);
     }
   };
 
@@ -196,18 +203,33 @@ export function ResultViewer({
 
         {/* View Mode Selectors */}
         {currentResult && sourceImage && (
-          <div className="flex items-center gap-1 rounded-lg bg-neutral-950 p-1 border border-neutral-800 self-start sm:self-auto">
+          <div className="flex items-center gap-1 rounded-lg bg-neutral-950 p-1 border border-neutral-800 self-start sm:self-auto flex-wrap">
             <button
-              onClick={() => setViewMode("split")}
+              id="vertical-slider-btn"
+              onClick={() => setViewMode("split-vertical")}
               className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
-                viewMode === "split"
+                viewMode === "split-vertical"
                   ? "bg-indigo-600 text-white font-medium shadow-sm"
                   : "text-neutral-400 hover:text-white"
               }`}
-              title="Split Drag Slider"
+              title="Vertical Comparison Slider (Top/Bottom)"
+            >
+              <ArrowUpDown className="h-3 w-3" />
+              <span>Vertical Slider</span>
+            </button>
+
+            <button
+              id="horizontal-slider-btn"
+              onClick={() => setViewMode("split-horizontal")}
+              className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${
+                viewMode === "split-horizontal"
+                  ? "bg-indigo-600 text-white font-medium shadow-sm"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+              title="Horizontal Comparison Slider (Left/Right)"
             >
               <ArrowLeftRight className="h-3 w-3" />
-              <span className="hidden sm:inline">Split Slider</span>
+              <span className="hidden sm:inline">Horizontal</span>
             </button>
 
             <button
@@ -276,16 +298,18 @@ export function ResultViewer({
           </div>
         ) : currentResult ? (
           /* Active Result Display */
-          viewMode === "split" && sourceImage ? (
-            /* Interactive Split-Screen Slider */
+          (viewMode === "split-vertical" || viewMode === "split-horizontal") && sourceImage ? (
+            /* Interactive Comparison Slider (Vertical or Horizontal) */
             <div
               ref={containerRef}
               onMouseMove={handleMouseMove}
               onTouchMove={handleTouchMove}
-              onClick={(e) => handleMove(e.clientX)}
-              className="relative w-full h-full cursor-ew-resize overflow-hidden flex items-center justify-center"
+              onClick={(e) => handleMove(e.clientX, e.clientY)}
+              className={`relative w-full h-full overflow-hidden flex items-center justify-center ${
+                viewMode === "split-vertical" ? "cursor-ns-resize" : "cursor-ew-resize"
+              }`}
             >
-              {/* Before Image (Underneath, full width) */}
+              {/* Reference Original Image (Underneath) */}
               <img
                 src={sourceImage}
                 alt="Original reference"
@@ -293,11 +317,14 @@ export function ResultViewer({
                 referrerPolicy="no-referrer"
               />
 
-              {/* After Image (Clipped on top by slider percentage) */}
+              {/* Transformed Result Image (Clipped on top/right depending on mode) */}
               <div
                 className="absolute inset-0 overflow-hidden pointer-events-none"
                 style={{
-                  clipPath: `polygon(${sliderPosition}% 0, 100% 0, 100% 100%, ${sliderPosition}% 100%)`,
+                  clipPath:
+                    viewMode === "split-vertical"
+                      ? `polygon(0 ${sliderPosition}%, 100% ${sliderPosition}%, 100% 100%, 0 100%)`
+                      : `polygon(${sliderPosition}% 0, 100% 0, 100% 100%, ${sliderPosition}% 100%)`,
                 }}
               >
                 <img
@@ -308,28 +335,61 @@ export function ResultViewer({
                 />
               </div>
 
-              {/* Vertical Draggable Divider Line */}
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.8)] z-20 pointer-events-none"
-                style={{ left: `${sliderPosition}%` }}
-              >
-                {/* Center Handle Pill */}
+              {/* Draggable Divider Line and Center Handle */}
+              {viewMode === "split-vertical" ? (
+                /* Horizontal Divider Line moving Vertically */
                 <div
-                  onMouseDown={handleMouseDown}
-                  onTouchStart={handleMouseDown}
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-neutral-900 shadow-xl border-2 border-indigo-600 pointer-events-auto cursor-ew-resize hover:scale-110 active:scale-95 transition-transform"
+                  className="absolute left-0 right-0 h-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.8)] z-20 pointer-events-none"
+                  style={{ top: `${sliderPosition}%` }}
                 >
-                  <ArrowLeftRight className="h-4 w-4 text-indigo-600" />
+                  <div
+                    onMouseDown={handleMouseDown}
+                    onTouchStart={handleMouseDown}
+                    className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 flex h-8 w-14 items-center justify-center rounded-full bg-white text-neutral-900 shadow-xl border-2 border-indigo-600 pointer-events-auto cursor-ns-resize hover:scale-110 active:scale-95 transition-transform"
+                    title="Drag vertically to compare Top (Original) vs Bottom (Result)"
+                  >
+                    <ArrowUpDown className="h-4 w-4 text-indigo-600" />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Vertical Divider Line moving Horizontally */
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.8)] z-20 pointer-events-none"
+                  style={{ left: `${sliderPosition}%` }}
+                >
+                  <div
+                    onMouseDown={handleMouseDown}
+                    onTouchStart={handleMouseDown}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-neutral-900 shadow-xl border-2 border-indigo-600 pointer-events-auto cursor-ew-resize hover:scale-110 active:scale-95 transition-transform"
+                    title="Drag horizontally to compare Left (Original) vs Right (Result)"
+                  >
+                    <ArrowLeftRight className="h-4 w-4 text-indigo-600" />
+                  </div>
+                </div>
+              )}
 
-              {/* Labels */}
-              <span className="absolute bottom-3 left-3 rounded-md bg-black/70 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white pointer-events-none z-10 border border-white/10">
-                Original ({(sliderPosition).toFixed(0)}%)
-              </span>
-              <span className="absolute bottom-3 right-3 rounded-md bg-indigo-600/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white pointer-events-none z-10 shadow-lg">
-                {currentResult.model} ({(100 - sliderPosition).toFixed(0)}%)
-              </span>
+              {/* Badges & Percentage Labels */}
+              {viewMode === "split-vertical" ? (
+                <>
+                  <span className="absolute top-3 left-3 rounded-md bg-black/70 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white pointer-events-none z-10 border border-white/10 flex items-center gap-1.5 shadow-md">
+                    <span>Top: Original</span>
+                    <span className="text-neutral-400 font-mono text-[10px]">({sliderPosition.toFixed(0)}%)</span>
+                  </span>
+                  <span className="absolute bottom-3 left-3 rounded-md bg-indigo-600/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white pointer-events-none z-10 shadow-lg flex items-center gap-1.5">
+                    <span>Bottom: {currentResult.model}</span>
+                    <span className="text-indigo-200 font-mono text-[10px]">({(100 - sliderPosition).toFixed(0)}%)</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="absolute bottom-3 left-3 rounded-md bg-black/70 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white pointer-events-none z-10 border border-white/10">
+                    Original ({sliderPosition.toFixed(0)}%)
+                  </span>
+                  <span className="absolute bottom-3 right-3 rounded-md bg-indigo-600/90 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white pointer-events-none z-10 shadow-lg">
+                    {currentResult.model} ({(100 - sliderPosition).toFixed(0)}%)
+                  </span>
+                </>
+              )}
             </div>
           ) : viewMode === "side-by-side" && sourceImage ? (
             /* Side-by-Side Comparison */

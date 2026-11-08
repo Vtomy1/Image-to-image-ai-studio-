@@ -15,7 +15,7 @@ export interface StylePreset {
   label: string;
   icon: string;
   prompt: string;
-  category: "Popular" | "Photorealistic" | "Artistic" | "Anime" | "Sci-Fi" | "Whimsical";
+  category: "Cinematic" | "Sketch" | "Oil Painting" | "Anime" | "Popular" | "Photorealistic" | "Artistic" | "Sci-Fi" | "Whimsical";
   modelRecommendation?: string;
   strengthRecommendation?: number;
 }
