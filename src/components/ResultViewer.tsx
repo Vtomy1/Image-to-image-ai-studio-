@@ -52,6 +52,8 @@ export function ResultViewer({
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +98,84 @@ export function ResultViewer({
     navigator.clipboard.writeText(String(value));
     setCopiedField(fieldKey);
     setTimeout(() => setCopiedField(null), 1800);
+  };
+
+  const handleDownload = async () => {
+    if (!currentResult) return;
+    setIsDownloading(true);
+    try {
+      const filename = `transformed-${currentResult.modelId || "image"}-${currentResult.seed || Date.now()}.png`;
+      await downloadImage(currentResult.imageUrl, filename);
+      setShareStatus("Saved to device!");
+      setTimeout(() => setShareStatus(null), 2500);
+    } catch (err) {
+      console.error("Download failed:", err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!currentResult) return;
+    setShareStatus("Sharing...");
+
+    // Try Web Share API (mobile/modern browsers)
+    if (navigator.share) {
+      try {
+        let fileToShare: File | null = null;
+        try {
+          const res = await fetch(currentResult.imageUrl);
+          const blob = await res.blob();
+          fileToShare = new File([blob], `ai-transform-${currentResult.modelId}.png`, {
+            type: blob.type || "image/png",
+          });
+        } catch (_fileErr) {
+          // Fall back to sharing URL or title/text if file creation fails
+        }
+
+        if (fileToShare && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+          await navigator.share({
+            title: `AI Transformation - ${currentResult.model}`,
+            text: `Generated with ${currentResult.model}: "${currentResult.prompt}"`,
+            files: [fileToShare],
+          });
+          setShareStatus("Shared successfully!");
+          setTimeout(() => setShareStatus(null), 2500);
+          return;
+        } else {
+          await navigator.share({
+            title: `AI Transformation - ${currentResult.model}`,
+            text: `Generated with ${currentResult.model}: "${currentResult.prompt}"`,
+            url: window.location.href,
+          });
+          setShareStatus("Shared successfully!");
+          setTimeout(() => setShareStatus(null), 2500);
+          return;
+        }
+      } catch (err: any) {
+        if (err.name === "AbortError") {
+          setShareStatus(null);
+          return;
+        }
+        console.warn("Native share failed, falling back to clipboard:", err);
+      }
+    }
+
+    // Fallback: Copy link or prompt + notification
+    try {
+      if (currentResult.imageUrl.startsWith("http")) {
+        await navigator.clipboard.writeText(currentResult.imageUrl);
+        setShareStatus("Image URL copied to clipboard!");
+      } else {
+        await navigator.clipboard.writeText(
+          `AI Transformation by ${currentResult.model} (Seed: ${currentResult.seed})\nPrompt: ${currentResult.prompt}`
+        );
+        setShareStatus("Image details copied to clipboard!");
+      }
+    } catch (_copyErr) {
+      setShareStatus("Link ready to share!");
+    }
+    setTimeout(() => setShareStatus(null), 2500);
   };
 
   return (
@@ -326,6 +406,26 @@ export function ResultViewer({
         {currentResult && (
           <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
             <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="rounded-lg bg-black/70 backdrop-blur-md border border-white/10 p-2 text-white hover:bg-black transition-colors flex items-center gap-1.5 text-xs font-medium shadow-md hover:border-indigo-500/50"
+              title="Download image locally to your device"
+              aria-label="Download image"
+            >
+              <Download className="h-3.5 w-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">Save</span>
+            </button>
+            <button
+              id="floating-share-btn"
+              onClick={handleShare}
+              className="rounded-lg bg-black/70 backdrop-blur-md border border-white/10 p-2 text-white hover:bg-black transition-colors flex items-center gap-1.5 text-xs font-medium shadow-md hover:border-purple-500/50"
+              title="Share image or copy details"
+              aria-label="Share image"
+            >
+              <Share2 className="h-3.5 w-3.5 text-purple-400" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+            <button
               onClick={() => setShowDetails((prev) => !prev)}
               className={`rounded-lg backdrop-blur-md border p-2 transition-colors flex items-center gap-1.5 text-xs font-medium shadow-md ${
                 showDetails
@@ -497,6 +597,27 @@ export function ResultViewer({
                   {currentResult.prompt}
                 </p>
               </div>
+
+              {/* Action Buttons inside Details Panel */}
+              <div className="pt-2 flex items-center gap-2 border-t border-neutral-800">
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-sm transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>{isDownloading ? "Saving..." : "Save Image"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-medium text-xs transition-colors"
+                >
+                  <Share2 className="h-3.5 w-3.5 text-purple-400" />
+                  <span>Share</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -510,16 +631,24 @@ export function ResultViewer({
               <button
                 id="download-hd-btn"
                 type="button"
-                onClick={() =>
-                  downloadImage(
-                    currentResult.imageUrl,
-                    `transformed-${currentResult.modelId}-${Date.now()}.png`
-                  )
-                }
-                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 shadow-md shadow-indigo-500/20 transition-colors"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 shadow-md shadow-indigo-500/20 transition-colors disabled:opacity-70"
+                title="Save generated transformation locally to your device"
               >
                 <Download className="h-3.5 w-3.5" />
-                <span>Download PNG</span>
+                <span>{isDownloading ? "Saving..." : "Download PNG"}</span>
+              </button>
+
+              <button
+                id="share-btn"
+                type="button"
+                onClick={handleShare}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-neutral-700 hover:text-white transition-colors"
+                title="Share this image via native device share or copy URL/metadata"
+              >
+                <Share2 className="h-3.5 w-3.5 text-purple-400" />
+                <span>Share</span>
               </button>
 
               <button
@@ -530,7 +659,8 @@ export function ResultViewer({
                 title="Feed this transformed image back as the source input for iterative chained styling"
               >
                 <RefreshCw className="h-3.5 w-3.5 text-indigo-400" />
-                <span>Use as Next Input</span>
+                <span className="hidden sm:inline">Use as Next Input</span>
+                <span className="sm:hidden">Chain</span>
               </button>
 
               <button
@@ -540,7 +670,8 @@ export function ResultViewer({
                 title="Generate again with a new random seed"
               >
                 <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                <span>Re-roll Seed</span>
+                <span className="hidden sm:inline">Re-roll Seed</span>
+                <span className="sm:hidden">Re-roll</span>
               </button>
             </div>
 
@@ -600,15 +731,43 @@ export function ResultViewer({
         </div>
       )}
 
+      {/* In-Viewer Notification Toast for Download / Share Feedback */}
+      {shareStatus && (
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-neutral-900/95 px-3.5 py-2 text-xs font-medium text-white shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-2">
+          <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+          <span>{shareStatus}</span>
+        </div>
+      )}
+
       {/* Fullscreen Modal */}
       {isFullscreen && currentResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
-          <button
-            onClick={() => setIsFullscreen(false)}
-            className="absolute top-4 right-4 rounded-full bg-neutral-900 border border-neutral-700 p-2 text-white hover:bg-neutral-800 z-50"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 shadow-lg transition-colors"
+              title="Download image locally to your device"
+            >
+              <Download className="h-4 w-4" />
+              <span>Download</span>
+            </button>
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 border border-neutral-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 shadow-lg transition-colors"
+              title="Share image"
+            >
+              <Share2 className="h-4 w-4 text-purple-400" />
+              <span>Share</span>
+            </button>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="rounded-full bg-neutral-900 border border-neutral-700 p-2 text-white hover:bg-neutral-800"
+              title="Close fullscreen"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
           <img
             src={currentResult.imageUrl}
             alt="Transformed fullscreen"
